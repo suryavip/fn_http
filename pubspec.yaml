@@ -1,7 +1,7 @@
 name: fn_http
 description: Simple HTTP wrapper with clear outcomes directed through callbacks
 version: 1.0.0
-# repository: https://github.com/suryavip/fn_http
+repository: https://github.com/suryavip/fn_http
 
 environment:
   sdk: ^3.3.4
