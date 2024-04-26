@@ -1,5 +1,5 @@
 name: fn_http
-description: A starting point for Dart libraries or applications.
+description: Simple HTTP wrapper with clear outcomes directed through callbacks
 version: 1.0.0
 # repository: https://github.com/suryavip/fn_http
 

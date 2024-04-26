@@ -1,1 +1,1 @@
-This is just a wrapper for using http package with purpose of minimum boilerplate per project and clear outcome (including error handling) directed through callbacks.
+This is just a wrapper for using http package with purpose of minimum boilerplate per project and clear outcomes (including error handling) directed through callbacks.
