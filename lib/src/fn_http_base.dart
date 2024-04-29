@@ -217,7 +217,11 @@ class FnHttp {
     }
 
     if (isSuccess) {
-      if (this.onSuccess != null) this.onSuccess!(this);
+      if (onSuccess != null) {
+        onSuccess(this);
+      } else if (this.onSuccess != null) {
+        this.onSuccess!(this);
+      }
     } else {
       _logError('Not pass assessor');
       if (onFailure != null) {
