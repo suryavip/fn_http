@@ -4,7 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
-typedef FnHttpCallback = void Function(FnHttp fnHttp);
+typedef FnHttpCallback = Future<void> Function(FnHttp fnHttp);
 typedef FnHttpAssessor = Future<bool> Function(FnHttp fnHttp);
 
 class FnHttp {
@@ -178,18 +178,18 @@ class FnHttp {
       result = await request.send();
     } catch (e) {
       if (onRequestFinish != null) {
-        onRequestFinish(this);
+        await onRequestFinish(this);
       } else if (this.onRequestFinish != null) {
-        this.onRequestFinish!(this);
+        await this.onRequestFinish!(this);
       }
 
       _logError('Failed Connection');
       if (onFailedConnection != null) {
-        onFailedConnection(this);
+        await onFailedConnection(this);
       } else if (this.onFailedConnection != null) {
-        this.onFailedConnection!(this);
+        await this.onFailedConnection!(this);
       } else if (defaultOnFailedConnection != null) {
-        defaultOnFailedConnection!(this);
+        await defaultOnFailedConnection!(this);
       }
       return;
     }
@@ -204,9 +204,9 @@ class FnHttp {
     }
 
     if (onRequestFinish != null) {
-      onRequestFinish(this);
+      await onRequestFinish(this);
     } else if (this.onRequestFinish != null) {
-      this.onRequestFinish!(this);
+      await this.onRequestFinish!(this);
     }
 
     bool isSuccess = true;
@@ -218,18 +218,18 @@ class FnHttp {
 
     if (isSuccess) {
       if (onSuccess != null) {
-        onSuccess(this);
+        await onSuccess(this);
       } else if (this.onSuccess != null) {
-        this.onSuccess!(this);
+        await this.onSuccess!(this);
       }
     } else {
       _logError('Not pass assessor');
       if (onFailure != null) {
-        onFailure(this);
+        await onFailure(this);
       } else if (this.onFailure != null) {
-        this.onFailure!(this);
+        await this.onFailure!(this);
       } else if (defaultOnFailure != null) {
-        defaultOnFailure!(this);
+        await defaultOnFailure!(this);
       }
     }
   }
