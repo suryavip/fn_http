@@ -134,7 +134,12 @@ class FnHttp {
     headers.addAll(additionalHeaders);
   }
 
-  Future send() async {
+  Future<void> send({
+    FnHttpCallback? onFailedConnection,
+    FnHttpCallback? onRequestFinish,
+    FnHttpCallback? onSuccess,
+    FnHttpCallback? onFailure,
+  }) async {
     if (requestModifier != null) {
       requestModifier!(this);
     } else if (defaultRequestModifier != null) {
@@ -172,11 +177,17 @@ class FnHttp {
     try {
       result = await request.send();
     } catch (e) {
-      if (onRequestFinish != null) onRequestFinish!(this);
+      if (onRequestFinish != null) {
+        onRequestFinish(this);
+      } else if (this.onRequestFinish != null) {
+        this.onRequestFinish!(this);
+      }
 
       _logError('Failed Connection');
       if (onFailedConnection != null) {
-        onFailedConnection!(this);
+        onFailedConnection(this);
+      } else if (this.onFailedConnection != null) {
+        this.onFailedConnection!(this);
       } else if (defaultOnFailedConnection != null) {
         defaultOnFailedConnection!(this);
       }
@@ -192,7 +203,11 @@ class FnHttp {
       _logError('Failed JSON Decoding');
     }
 
-    if (onRequestFinish != null) onRequestFinish!(this);
+    if (onRequestFinish != null) {
+      onRequestFinish(this);
+    } else if (this.onRequestFinish != null) {
+      this.onRequestFinish!(this);
+    }
 
     bool isSuccess = true;
     if (assessor != null) {
@@ -202,11 +217,13 @@ class FnHttp {
     }
 
     if (isSuccess) {
-      if (onSuccess != null) onSuccess!(this);
+      if (this.onSuccess != null) this.onSuccess!(this);
     } else {
       _logError('Not pass assessor');
       if (onFailure != null) {
-        onFailure!(this);
+        onFailure(this);
+      } else if (this.onFailure != null) {
+        this.onFailure!(this);
       } else if (defaultOnFailure != null) {
         defaultOnFailure!(this);
       }
