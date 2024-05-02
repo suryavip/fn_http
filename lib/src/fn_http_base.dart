@@ -21,7 +21,7 @@ class FnHttp {
   late final Map<String, String> headers;
   final Map<String, String>? bodyFields;
   final Map<String, dynamic>? bodyJson;
-  final Map<String, File> files;
+  final Map<String, List<File>> files;
 
   /// Usually used for calling [injectToBody] and [injectToHeader].
   /// Will replace [defaultRequestModifier] if defined.
@@ -153,25 +153,27 @@ class FnHttp {
       request = http.MultipartRequest(method, uri);
       (request as http.MultipartRequest).fields.addAll(bodyFields!);
       for (final key in files.keys) {
-        final file = files[key]!;
-        final data = await file.readAsBytes();
-        final mimeType = lookupMimeType(
-          file.path,
-          headerBytes: data,
-        );
-        MediaType? contentType;
-        if (mimeType != null) {
-          final split = mimeType.split('/');
-          contentType = MediaType(split[0], split[1]);
+        final filesPerKey = files[key]!;
+        for (final file in filesPerKey) {
+          final data = await file.readAsBytes();
+          final mimeType = lookupMimeType(
+            file.path,
+            headerBytes: data,
+          );
+          MediaType? contentType;
+          if (mimeType != null) {
+            final split = mimeType.split('/');
+            contentType = MediaType(split[0], split[1]);
+          }
+          (request as http.MultipartRequest)
+              .files
+              .add(http.MultipartFile.fromBytes(
+                key,
+                data,
+                filename: file.path,
+                contentType: contentType,
+              ));
         }
-        (request as http.MultipartRequest)
-            .files
-            .add(http.MultipartFile.fromBytes(
-              key,
-              data,
-              filename: files[key]!.path,
-              contentType: contentType,
-            ));
       }
     } else {
       request = http.Request(method, uri);
