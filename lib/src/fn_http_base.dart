@@ -3,6 +3,9 @@ import 'dart:developer';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:mime/mime.dart';
+// ignore: depend_on_referenced_packages
+import 'package:http_parser/http_parser.dart';
 
 typedef FnHttpCallback = Future<void> Function(FnHttp fnHttp);
 typedef FnHttpAssessor = Future<bool> Function(FnHttp fnHttp);
@@ -150,12 +153,24 @@ class FnHttp {
       request = http.MultipartRequest(method, uri);
       (request as http.MultipartRequest).fields.addAll(bodyFields!);
       for (final key in files.keys) {
+        final file = files[key]!;
+        final data = await file.readAsBytes();
+        final mimeType = lookupMimeType(
+          file.path,
+          headerBytes: data,
+        );
+        MediaType? contentType;
+        if (mimeType != null) {
+          final split = mimeType.split('/');
+          contentType = MediaType(split[0], split[1]);
+        }
         (request as http.MultipartRequest)
             .files
             .add(http.MultipartFile.fromBytes(
               key,
-              await files[key]!.readAsBytes(),
+              data,
               filename: files[key]!.path,
+              contentType: contentType,
             ));
       }
     } else {
