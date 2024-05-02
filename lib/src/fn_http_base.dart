@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
-// ignore: depend_on_referenced_packages
 import 'package:http_parser/http_parser.dart';
 
 typedef FnHttpCallback = Future<void> Function(FnHttp fnHttp);
