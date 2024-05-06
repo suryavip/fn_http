@@ -150,7 +150,7 @@ class FnHttp {
 
     if (files.isNotEmpty) {
       request = http.MultipartRequest(method, uri);
-      (request as http.MultipartRequest).fields.addAll(bodyFields!);
+      (request as http.MultipartRequest).fields.addAll(bodyFields ?? {});
       for (final key in files.keys) {
         final filesPerKey = files[key]!;
         for (final file in filesPerKey) {
@@ -178,7 +178,7 @@ class FnHttp {
       request = http.Request(method, uri);
       if (bodyFields != null) {
         (request as http.Request).bodyFields = bodyFields!;
-      } else {
+      } else if (bodyJson != null) {
         (request as http.Request).body = jsonEncode(bodyJson);
       }
     }
