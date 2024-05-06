@@ -1,20 +1,14 @@
 import 'dart:convert';
-import 'dart:developer';
 import 'dart:io';
 
+import 'package:fn_http/src/instance.dart';
+import 'package:fn_http/src/typedefs.dart';
 import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';
 
-typedef FnHttpCallback = Future<void> Function(FnHttp fnHttp);
-typedef FnHttpAssessor = Future<bool> Function(FnHttp fnHttp);
-
 class FnHttp {
-  static FnHttpCallback? defaultRequestModifier;
-  static FnHttpCallback? defaultOnFailedConnection;
-  static FnHttpAssessor? defaultAssessor;
-  static FnHttpCallback? defaultOnFailure;
-
+  final FnHttpInstance instance;
   final String method;
   final Uri uri;
   late final Map<String, String> headers;
@@ -23,17 +17,17 @@ class FnHttp {
   final Map<String, List<File>> files;
 
   /// Usually used for calling [injectToBody] and [injectToHeader].
-  /// Will replace [defaultRequestModifier] if defined.
+  /// Will replace [instance.defaultRequestModifier] if defined.
   final FnHttpCallback? requestModifier;
 
   /// Called when connection failed.
-  /// Will replace [defaultOnFailedConnection] if defined.
+  /// Will replace [instance.defaultOnFailedConnection] if defined.
   final FnHttpCallback? onFailedConnection;
 
   /// Used to determine whether the request success or not.
   /// Returning true will make the request considered as succeeded.
-  /// Will replace [defaultAssessor] if defined.
-  /// If neither [assessor] and [defaultAssessor] defined, the request
+  /// Will replace [instance.defaultAssessor] if defined.
+  /// If neither [assessor] and [instance.defaultAssessor] defined, the request
   /// always be considered as succeeded.
   final FnHttpAssessor? assessor;
 
@@ -48,7 +42,7 @@ class FnHttp {
   late http.BaseRequest request;
   http.StreamedResponse? result;
   http.Response? response;
-  dynamic jsonDecodedResponse;
+  Map<String, dynamic> jsonDecodedResponse = {};
 
   /// The order of execution:
   /// 1. [requestModifier].
@@ -61,6 +55,7 @@ class FnHttp {
   /// 8. [onRequestFinish].
   /// 9. [onSuccess] or [onFailure].
   FnHttp({
+    required this.instance,
     required this.method,
     required this.uri,
     Map<String, String>? headers,
@@ -79,48 +74,48 @@ class FnHttp {
             (bodyJson != null && bodyFields == null && files.isEmpty));
 
   void _logRequest() {
-    log(
+    instance.sendLog(
       request.headers.toString(),
-      name: '$method $uri (Request Headers)',
+      '$method $uri (Request Headers)',
     );
     if (request is http.MultipartRequest) {
-      log(
+      instance.sendLog(
         (request as http.MultipartRequest).fields.toString(),
-        name: '$method $uri (Request Body)',
+        '$method $uri (Request Body)',
       );
-      log(
+      instance.sendLog(
         (request as http.MultipartRequest)
             .files
             .map((e) => '${e.field}: ${e.filename} (${e.length})')
             .toString(),
-        name: '$method $uri (Request Body Files)',
+        '$method $uri (Request Body Files)',
       );
     }
     if (request is http.Request) {
-      log(
+      instance.sendLog(
         bodyFields != null
             ? (request as http.Request).bodyFields.toString()
             : (request as http.Request).body.toString(),
-        name: '$method $uri (Request Body)',
+        '$method $uri (Request Body)',
       );
     }
   }
 
   void _logResponse() {
-    log(
+    instance.sendLog(
       response?.headers.toString() ?? '<no response headers>',
-      name: '$method $uri (Response Headers)',
+      '$method $uri (Response Headers)',
     );
-    log(
+    instance.sendLog(
       response?.body.toString() ?? '<no response body>',
-      name: '$method $uri (Response Body)',
+      '$method $uri (Response Body)',
     );
   }
 
   void _logError(String message) {
-    log(
+    instance.sendLog(
       message,
-      name: '$method $uri: error',
+      '$method $uri: error',
     );
   }
 
@@ -144,8 +139,8 @@ class FnHttp {
   }) async {
     if (requestModifier != null) {
       requestModifier!(this);
-    } else if (defaultRequestModifier != null) {
-      defaultRequestModifier!(this);
+    } else if (instance.defaultRequestModifier != null) {
+      instance.defaultRequestModifier!(this);
     }
 
     if (files.isNotEmpty) {
@@ -204,8 +199,8 @@ class FnHttp {
         await onFailedConnection(this);
       } else if (this.onFailedConnection != null) {
         await this.onFailedConnection!(this);
-      } else if (defaultOnFailedConnection != null) {
-        await defaultOnFailedConnection!(this);
+      } else if (instance.defaultOnFailedConnection != null) {
+        await instance.defaultOnFailedConnection!(this);
       }
       return;
     }
@@ -228,8 +223,8 @@ class FnHttp {
     bool isSuccess = true;
     if (assessor != null) {
       isSuccess = await assessor!(this);
-    } else if (defaultAssessor != null) {
-      isSuccess = await defaultAssessor!(this);
+    } else if (instance.defaultAssessor != null) {
+      isSuccess = await instance.defaultAssessor!(this);
     }
 
     if (isSuccess) {
@@ -244,8 +239,8 @@ class FnHttp {
         await onFailure(this);
       } else if (this.onFailure != null) {
         await this.onFailure!(this);
-      } else if (defaultOnFailure != null) {
-        await defaultOnFailure!(this);
+      } else if (instance.defaultOnFailure != null) {
+        await instance.defaultOnFailure!(this);
       }
     }
   }
