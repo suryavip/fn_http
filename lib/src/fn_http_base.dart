@@ -42,7 +42,7 @@ class FnHttp {
   late http.BaseRequest request;
   http.StreamedResponse? result;
   http.Response? response;
-  Map<String, dynamic> jsonDecodedResponse = {};
+  dynamic jsonDecodedResponse;
 
   /// The order of execution:
   /// 1. [requestModifier].
@@ -211,6 +211,7 @@ class FnHttp {
     try {
       jsonDecodedResponse = jsonDecode(response!.body);
     } catch (e) {
+      jsonDecodedResponse = {};
       _logError('Failed JSON Decoding');
     }
 
