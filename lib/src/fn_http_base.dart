@@ -109,7 +109,7 @@ class FnHttp {
     String bodyLog = response?.body.toString() ?? '<no response body>';
     if (bodyLog.length > 100 * 1024) bodyLog = '<${bodyLog.length}B body>';
     instance.sendLog(
-      response?.body.toString() ?? '<no response body>',
+      bodyLog,
       '$method $uri (Response Body)',
     );
   }
