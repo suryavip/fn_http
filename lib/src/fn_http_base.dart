@@ -15,6 +15,7 @@ class FnHttp {
   final Map<String, String>? bodyFields;
   final Map<String, dynamic>? bodyJson;
   final Map<String, List<File>> files;
+  final Duration? timeout;
 
   /// Usually used for calling [injectToBody] and [injectToHeader].
   /// Will replace [instance.defaultRequestModifier] if defined.
@@ -62,6 +63,7 @@ class FnHttp {
     this.bodyFields,
     this.bodyJson,
     this.files = const {},
+    this.timeout,
     this.requestModifier,
     this.onFailedConnection,
     this.assessor,
@@ -134,6 +136,7 @@ class FnHttp {
   }
 
   Future<void> send({
+    Duration? timeout,
     FnHttpCallback? onFailedConnection,
     FnHttpCallback? onRequestFinish,
     FnHttpCallback? onSuccess,
@@ -188,7 +191,16 @@ class FnHttp {
     _logRequest();
 
     try {
-      result = await request.send();
+      result = await Future.any([
+        request.send(),
+        if (timeout != null)
+          Future.delayed(timeout)
+        else if (this.timeout != null)
+          Future.delayed(this.timeout!),
+      ]);
+      if (result == null) {
+        throw 'timeout';
+      }
     } catch (e) {
       if (onRequestFinish != null) {
         await onRequestFinish(this);
