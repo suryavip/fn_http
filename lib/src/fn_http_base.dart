@@ -15,11 +15,16 @@ class FnHttp {
   final Map<String, String>? bodyFields;
   final Map<String, dynamic>? bodyJson;
   final Map<String, List<File>> files;
-  final Duration? timeout;
 
   /// Usually used for calling [injectToBody] and [injectToHeader].
   /// Will replace [instance.defaultRequestModifier] if defined.
   final FnHttpCallback? requestModifier;
+
+  final Duration? timeout;
+
+  /// Called when [timeout] finish first in race againts request.
+  /// Will replace [instance.defaultOnTimeout] if defined.
+  final FnHttpCallback? onTimeout;
 
   /// Called when connection failed.
   /// Will replace [instance.defaultOnFailedConnection] if defined.
@@ -49,12 +54,14 @@ class FnHttp {
   /// 1. [requestModifier].
   /// 2. Insertion of ([bodyFields] and [files]) or [bodyJson]. [request] initialized on this step.
   /// 3. Doing the actual request.
-  /// 4. On failed connection: [onRequestFinish] then [onFailedConnection].
-  /// 5. [response] should be available now.
-  /// 6. Trying to fill [jsonDecodedResponse].
-  /// 7. [assessor].
-  /// 8. [onRequestFinish].
-  /// 9. [onSuccess] or [onFailure].
+  /// 4. Request will race againts [timeout] if not omited.
+  /// 5. When [timeout] won, [onRequestFinish] then [onTimeout].
+  /// 6. On failed connection: [onRequestFinish] then [onFailedConnection].
+  /// 7. [response] should be available now.
+  /// 8. Trying to fill [jsonDecodedResponse].
+  /// 9. [assessor].
+  /// 10. [onRequestFinish].
+  /// 11. [onSuccess] or [onFailure].
   FnHttp({
     required this.instance,
     required this.method,
@@ -63,8 +70,9 @@ class FnHttp {
     this.bodyFields,
     this.bodyJson,
     this.files = const {},
-    this.timeout,
     this.requestModifier,
+    this.timeout,
+    this.onTimeout,
     this.onFailedConnection,
     this.assessor,
     this.onRequestFinish,
@@ -109,7 +117,7 @@ class FnHttp {
       '$method $uri (Response Headers)',
     );
     String bodyLog = response?.body.toString() ?? '<no response body>';
-    if (bodyLog.length > 100 * 1024) bodyLog = '<${bodyLog.length}B body>';
+    if (bodyLog.length > 64 * 1024) bodyLog = '<${bodyLog.length}B body>';
     instance.sendLog(
       bodyLog,
       '$method $uri (Response Body)',
@@ -137,6 +145,7 @@ class FnHttp {
 
   Future<void> send({
     Duration? timeout,
+    FnHttpCallback? onTimeout,
     FnHttpCallback? onFailedConnection,
     FnHttpCallback? onRequestFinish,
     FnHttpCallback? onSuccess,
@@ -208,13 +217,24 @@ class FnHttp {
         await this.onRequestFinish!(this);
       }
 
-      _logError('Failed Connection');
-      if (onFailedConnection != null) {
-        await onFailedConnection(this);
-      } else if (this.onFailedConnection != null) {
-        await this.onFailedConnection!(this);
-      } else if (instance.defaultOnFailedConnection != null) {
-        await instance.defaultOnFailedConnection!(this);
+      if (e == 'timeout') {
+        _logError('Timeout');
+        if (onTimeout != null) {
+          await onTimeout(this);
+        } else if (this.onTimeout != null) {
+          await this.onTimeout!(this);
+        } else if (instance.defaultOnTimeout != null) {
+          await instance.defaultOnTimeout!(this);
+        }
+      } else {
+        _logError('Failed Connection');
+        if (onFailedConnection != null) {
+          await onFailedConnection(this);
+        } else if (this.onFailedConnection != null) {
+          await this.onFailedConnection!(this);
+        } else if (instance.defaultOnFailedConnection != null) {
+          await instance.defaultOnFailedConnection!(this);
+        }
       }
       return;
     }
