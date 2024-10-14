@@ -1,3 +1,9 @@
+## 3.0.0
+
+- Wait for `defaultRequestModifier` and `requestModifier` to finish.
+- Add `defaultPreRequest` and `preRequest` callback.
+- Add `defaultOnAborted` and `onAborted` callback.
+
 ## 2.2.2
 
 - Update packages

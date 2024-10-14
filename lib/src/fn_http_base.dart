@@ -16,6 +16,15 @@ class FnHttp {
   final Map<String, dynamic>? bodyJson;
   final Map<String, List<File>> files;
 
+  /// Determine whether the request can be proceeded.
+  /// If return false, then this request is canceled and [onAborted] is called.
+  /// Will replace [instance.preRequest] if defined.
+  final FnHttpAssessor? preRequest;
+
+  /// Called when [preRequest] return false.
+  /// Will replace [instance.defaultOnAborted] if defined.
+  final FnHttpCallback? onAborted;
+
   /// Usually used for calling [injectToBody] and [injectToHeader].
   /// Will replace [instance.defaultRequestModifier] if defined.
   final FnHttpCallback? requestModifier;
@@ -51,6 +60,8 @@ class FnHttp {
   dynamic jsonDecodedResponse;
 
   /// The order of execution:
+  /// 1. [preRequest].
+  /// 1. When [preRequest] return false, [onRequestFinish] then [onAborted] are called and send is finished.
   /// 1. [requestModifier].
   /// 2. Insertion of ([bodyFields] and [files]) or [bodyJson]. [request] initialized on this step.
   /// 3. Doing the actual request.
@@ -70,6 +81,8 @@ class FnHttp {
     this.bodyFields,
     this.bodyJson,
     this.files = const {},
+    this.preRequest,
+    this.onAborted,
     this.requestModifier,
     this.timeout,
     this.onTimeout,
@@ -151,10 +164,32 @@ class FnHttp {
     FnHttpCallback? onSuccess,
     FnHttpCallback? onFailure,
   }) async {
+    bool preRequestResult = true;
+    if (preRequest != null) {
+      preRequestResult = await preRequest!(this);
+    } else if (instance.defaultPreRequest != null) {
+      preRequestResult = await instance.defaultPreRequest!(this);
+    }
+
+    if (preRequestResult == false) {
+      if (onRequestFinish != null) {
+        await onRequestFinish(this);
+      } else if (this.onRequestFinish != null) {
+        await this.onRequestFinish!(this);
+      }
+
+      if (onAborted != null) {
+        await onAborted!(this);
+      } else if (instance.defaultOnAborted != null) {
+        await instance.defaultOnAborted!(this);
+      }
+      return;
+    }
+
     if (requestModifier != null) {
-      requestModifier!(this);
+      await requestModifier!(this);
     } else if (instance.defaultRequestModifier != null) {
-      instance.defaultRequestModifier!(this);
+      await instance.defaultRequestModifier!(this);
     }
 
     if (files.isNotEmpty) {

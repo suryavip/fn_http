@@ -4,6 +4,8 @@ import 'package:fn_http/src/typedefs.dart';
 
 class FnHttpInstance {
   final String instanceLogName;
+  final FnHttpAssessor? defaultPreRequest;
+  final FnHttpCallback? defaultOnAborted;
   final FnHttpCallback? defaultRequestModifier;
   final Duration? defaultTimeout;
   final FnHttpCallback? defaultOnTimeout;
@@ -13,6 +15,8 @@ class FnHttpInstance {
 
   const FnHttpInstance({
     required this.instanceLogName,
+    this.defaultPreRequest,
+    this.defaultOnAborted,
     this.defaultRequestModifier,
     this.defaultTimeout,
     this.defaultOnTimeout,
