@@ -1,3 +1,7 @@
+## 3.1.0
+
+- Use `utf8.decode` before `jsonDecode`.
+
 ## 3.0.0
 
 - Wait for `defaultRequestModifier` and `requestModifier` to finish.

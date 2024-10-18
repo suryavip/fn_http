@@ -278,7 +278,7 @@ class FnHttp {
     _logResponse();
 
     try {
-      jsonDecodedResponse = jsonDecode(response!.body);
+      jsonDecodedResponse = jsonDecode(utf8.decode(response!.bodyBytes));
     } catch (e) {
       jsonDecodedResponse = {};
       _logError('Failed JSON Decoding');
