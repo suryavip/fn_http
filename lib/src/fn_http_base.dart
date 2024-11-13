@@ -15,6 +15,7 @@ class FnHttp {
   final Map<String, String>? bodyFields;
   final Map<String, dynamic>? bodyJson;
   final Map<String, List<File>> files;
+  final List<http.MultipartFile> multipartFiles;
 
   /// Determine whether the request can be proceeded.
   /// If return false, then this request is canceled and [onAborted] is called.
@@ -81,6 +82,7 @@ class FnHttp {
     this.bodyFields,
     this.bodyJson,
     this.files = const {},
+    this.multipartFiles = const [],
     this.preRequest,
     this.onAborted,
     this.requestModifier,
@@ -192,7 +194,7 @@ class FnHttp {
       await instance.defaultRequestModifier!(this);
     }
 
-    if (files.isNotEmpty) {
+    if (files.isNotEmpty || multipartFiles.isNotEmpty) {
       request = http.MultipartRequest(method, uri);
       (request as http.MultipartRequest).fields.addAll(bodyFields ?? {});
       for (final key in files.keys) {
@@ -217,6 +219,9 @@ class FnHttp {
                 contentType: contentType,
               ));
         }
+      }
+      for (final multipartFile in multipartFiles) {
+        (request as http.MultipartRequest).files.add(multipartFile);
       }
     } else {
       request = http.Request(method, uri);

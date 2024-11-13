@@ -1,3 +1,7 @@
+## 3.2.0
+
+- Allow manually add `multipartFiles` when usage of `File` is not possible.
+
 ## 3.1.0
 
 - Use `utf8.decode` before `jsonDecode`.
