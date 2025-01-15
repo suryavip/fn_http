@@ -1,3 +1,7 @@
+## 3.3.2
+
+- Can accept `XFile`.
+
 ## 3.2.0
 
 - Allow manually add `multipartFiles` when usage of `File` is not possible.

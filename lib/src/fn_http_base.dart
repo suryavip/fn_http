@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cross_file/cross_file.dart';
 import 'package:fn_http/src/instance.dart';
 import 'package:fn_http/src/typedefs.dart';
 import 'package:http/http.dart' as http;
@@ -15,6 +16,7 @@ class FnHttp {
   final Map<String, String>? bodyFields;
   final Map<String, dynamic>? bodyJson;
   final Map<String, List<File>> files;
+  final Map<String, List<XFile>> xFiles;
   final List<http.MultipartFile> multipartFiles;
 
   /// Determine whether the request can be proceeded.
@@ -82,6 +84,7 @@ class FnHttp {
     this.bodyFields,
     this.bodyJson,
     this.files = const {},
+    this.xFiles = const {},
     this.multipartFiles = const [],
     this.preRequest,
     this.onAborted,
@@ -96,7 +99,10 @@ class FnHttp {
   })  : headers = headers ?? {},
         assert((bodyFields == null && bodyJson == null) ||
             (bodyFields != null && bodyJson == null) ||
-            (bodyJson != null && bodyFields == null && files.isEmpty));
+            (bodyJson != null &&
+                bodyFields == null &&
+                files.isEmpty &&
+                xFiles.isEmpty));
 
   void _logRequest() {
     instance.sendLog(
@@ -194,7 +200,7 @@ class FnHttp {
       await instance.defaultRequestModifier!(this);
     }
 
-    if (files.isNotEmpty || multipartFiles.isNotEmpty) {
+    if (files.isNotEmpty || xFiles.isNotEmpty || multipartFiles.isNotEmpty) {
       request = http.MultipartRequest(method, uri);
       (request as http.MultipartRequest).fields.addAll(bodyFields ?? {});
       for (final key in files.keys) {
@@ -216,6 +222,29 @@ class FnHttp {
                 key,
                 data,
                 filename: file.path,
+                contentType: contentType,
+              ));
+        }
+      }
+      for (final key in xFiles.keys) {
+        final filesPerKey = xFiles[key]!;
+        for (final file in filesPerKey) {
+          final data = await file.readAsBytes();
+          final mimeType = lookupMimeType(
+            file.path,
+            headerBytes: data,
+          );
+          MediaType? contentType;
+          if (mimeType != null) {
+            final split = mimeType.split('/');
+            contentType = MediaType(split[0], split[1]);
+          }
+          (request as http.MultipartRequest)
+              .files
+              .add(http.MultipartFile.fromBytes(
+                key,
+                data,
+                filename: file.name,
                 contentType: contentType,
               ));
         }
