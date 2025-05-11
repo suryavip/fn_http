@@ -1,3 +1,9 @@
+## 4.0.0
+
+- Dart SDK requirement to `^3.7.0`
+- Add `retry()` method for easy retry.
+- **BREAKING CHANGE**: now assessor returns `AssessmentResult` instead of `bool`. Returning `AssessmentResult.retry` will automatically call `retry()`.
+
 ## 3.3.2
 
 - Can accept `XFile`.
