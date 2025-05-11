@@ -96,13 +96,15 @@ class FnHttp {
     this.onRequestFinish,
     this.onSuccess,
     this.onFailure,
-  })  : headers = headers ?? {},
-        assert((bodyFields == null && bodyJson == null) ||
-            (bodyFields != null && bodyJson == null) ||
-            (bodyJson != null &&
-                bodyFields == null &&
-                files.isEmpty &&
-                xFiles.isEmpty));
+  }) : headers = headers ?? {},
+       assert(
+         (bodyFields == null && bodyJson == null) ||
+             (bodyFields != null && bodyJson == null) ||
+             (bodyJson != null &&
+                 bodyFields == null &&
+                 files.isEmpty &&
+                 xFiles.isEmpty),
+       );
 
   void _logRequest() {
     instance.sendLog(
@@ -115,8 +117,7 @@ class FnHttp {
         '$method $uri (Request Body)',
       );
       instance.sendLog(
-        (request as http.MultipartRequest)
-            .files
+        (request as http.MultipartRequest).files
             .map((e) => '${e.field}: ${e.filename} (${e.length})')
             .toString(),
         '$method $uri (Request Body Files)',
@@ -139,17 +140,11 @@ class FnHttp {
     );
     String bodyLog = response?.body.toString() ?? '<no response body>';
     if (bodyLog.length > 64 * 1024) bodyLog = '<${bodyLog.length}B body>';
-    instance.sendLog(
-      bodyLog,
-      '$method $uri (Response Body)',
-    );
+    instance.sendLog(bodyLog, '$method $uri (Response Body)');
   }
 
   void _logError(String message) {
-    instance.sendLog(
-      message,
-      '$method $uri: error',
-    );
+    instance.sendLog(message, '$method $uri: error');
   }
 
   void injectToBody(Map<String, String> additionalBody) {
@@ -164,6 +159,25 @@ class FnHttp {
     headers.addAll(additionalHeaders);
   }
 
+  Duration? _lastTimeout;
+  FnHttpCallback? _lastOnTimeout;
+  FnHttpCallback? _lastOnFailedConnection;
+  FnHttpCallback? _lastOnRequestFinish;
+  FnHttpCallback? _lastOnSuccess;
+  FnHttpCallback? _lastOnFailure;
+
+  Future<void> retry([FnHttpCallback? modifier]) {
+    if (modifier != null) modifier(this);
+    return send(
+      timeout: _lastTimeout,
+      onTimeout: _lastOnTimeout,
+      onFailedConnection: _lastOnFailedConnection,
+      onRequestFinish: _lastOnRequestFinish,
+      onSuccess: _lastOnSuccess,
+      onFailure: _lastOnFailure,
+    );
+  }
+
   Future<void> send({
     Duration? timeout,
     FnHttpCallback? onTimeout,
@@ -172,6 +186,13 @@ class FnHttp {
     FnHttpCallback? onSuccess,
     FnHttpCallback? onFailure,
   }) async {
+    _lastTimeout = timeout;
+    _lastOnTimeout = onTimeout;
+    _lastOnFailedConnection = onFailedConnection;
+    _lastOnRequestFinish = onRequestFinish;
+    _lastOnSuccess = onSuccess;
+    _lastOnFailure = onFailure;
+
     bool preRequestResult = true;
     if (preRequest != null) {
       preRequestResult = await preRequest!(this);
@@ -207,46 +228,40 @@ class FnHttp {
         final filesPerKey = files[key]!;
         for (final file in filesPerKey) {
           final data = await file.readAsBytes();
-          final mimeType = lookupMimeType(
-            file.path,
-            headerBytes: data,
-          );
+          final mimeType = lookupMimeType(file.path, headerBytes: data);
           MediaType? contentType;
           if (mimeType != null) {
             final split = mimeType.split('/');
             contentType = MediaType(split[0], split[1]);
           }
-          (request as http.MultipartRequest)
-              .files
-              .add(http.MultipartFile.fromBytes(
-                key,
-                data,
-                filename: file.path,
-                contentType: contentType,
-              ));
+          (request as http.MultipartRequest).files.add(
+            http.MultipartFile.fromBytes(
+              key,
+              data,
+              filename: file.path,
+              contentType: contentType,
+            ),
+          );
         }
       }
       for (final key in xFiles.keys) {
         final filesPerKey = xFiles[key]!;
         for (final file in filesPerKey) {
           final data = await file.readAsBytes();
-          final mimeType = lookupMimeType(
-            file.path,
-            headerBytes: data,
-          );
+          final mimeType = lookupMimeType(file.path, headerBytes: data);
           MediaType? contentType;
           if (mimeType != null) {
             final split = mimeType.split('/');
             contentType = MediaType(split[0], split[1]);
           }
-          (request as http.MultipartRequest)
-              .files
-              .add(http.MultipartFile.fromBytes(
-                key,
-                data,
-                filename: file.name,
-                contentType: contentType,
-              ));
+          (request as http.MultipartRequest).files.add(
+            http.MultipartFile.fromBytes(
+              key,
+              data,
+              filename: file.name,
+              contentType: contentType,
+            ),
+          );
         }
       }
       for (final multipartFile in multipartFiles) {
