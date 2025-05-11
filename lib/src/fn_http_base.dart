@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:cross_file/cross_file.dart';
+import 'package:fn_http/src/assessment_result.dart';
 import 'package:fn_http/src/instance.dart';
 import 'package:fn_http/src/typedefs.dart';
 import 'package:http/http.dart' as http;
@@ -22,7 +23,7 @@ class FnHttp {
   /// Determine whether the request can be proceeded.
   /// If return false, then this request is canceled and [onAborted] is called.
   /// Will replace [instance.preRequest] if defined.
-  final FnHttpAssessor? preRequest;
+  final FnHttpPreRequest? preRequest;
 
   /// Called when [preRequest] return false.
   /// Will replace [instance.defaultOnAborted] if defined.
@@ -339,19 +340,22 @@ class FnHttp {
       await this.onRequestFinish!(this);
     }
 
-    bool isSuccess = true;
+    AssessmentResult assessmentResult = AssessmentResult.success;
     if (assessor != null) {
-      isSuccess = await assessor!(this);
+      assessmentResult = await assessor!(this);
     } else if (instance.defaultAssessor != null) {
-      isSuccess = await instance.defaultAssessor!(this);
+      assessmentResult = await instance.defaultAssessor!(this);
     }
 
-    if (isSuccess) {
+    if (assessmentResult == AssessmentResult.success) {
       if (onSuccess != null) {
         await onSuccess(this);
       } else if (this.onSuccess != null) {
         await this.onSuccess!(this);
       }
+    } else if (assessmentResult == AssessmentResult.retry) {
+      _logError('Retry recommended by assessor');
+      await retry();
     } else {
       _logError('Not pass assessor');
       if (onFailure != null) {
