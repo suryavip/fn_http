@@ -76,7 +76,7 @@ class FnHttp {
   /// 8. Trying to fill [jsonDecodedResponse].
   /// 9. [assessor].
   /// 10. [onRequestFinish].
-  /// 11. [onSuccess] or [onFailure].
+  /// 11. [onSuccess] or [onFailure] or calling [retry].
   FnHttp({
     required this.instance,
     required this.method,
