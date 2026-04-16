@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -61,7 +62,7 @@ class FnHttp {
   late http.BaseRequest request;
   http.StreamedResponse? result;
   http.Response? response;
-  dynamic jsonDecodedResponse;
+  Map<String, dynamic>? jsonDecodedResponse;
 
   /// The order of execution:
   /// 1. [preRequest].
@@ -160,12 +161,12 @@ class FnHttp {
     headers.addAll(additionalHeaders);
   }
 
-  Duration? _lastTimeout;
-  FnHttpCallback? _lastOnTimeout;
-  FnHttpCallback? _lastOnFailedConnection;
-  FnHttpCallback? _lastOnRequestFinish;
-  FnHttpCallback? _lastOnSuccess;
-  FnHttpCallback? _lastOnFailure;
+  late Duration? _lastTimeout;
+  late FnHttpCallback? _lastOnTimeout;
+  late FnHttpCallback? _lastOnFailedConnection;
+  late FnHttpCallback? _lastOnRequestFinish;
+  late FnHttpCallback? _lastOnSuccess;
+  late FnHttpCallback? _lastOnFailure;
 
   Future<void> retry([FnHttpCallback? modifier]) {
     if (modifier != null) modifier(this);
@@ -285,16 +286,28 @@ class FnHttp {
     _logRequest();
 
     try {
-      result = await Future.any([
-        request.send(),
-        if (timeout != null)
-          Future.delayed(timeout)
-        else if (this.timeout != null)
-          Future.delayed(this.timeout!),
-      ]);
-      if (result == null) {
-        throw 'timeout';
+      final effectiveTimeout = timeout ?? this.timeout;
+      if (effectiveTimeout != null) {
+        result = await request.send().timeout(effectiveTimeout);
+      } else {
+        result = await request.send();
       }
+    } on TimeoutException {
+      if (onRequestFinish != null) {
+        await onRequestFinish(this);
+      } else if (this.onRequestFinish != null) {
+        await this.onRequestFinish!(this);
+      }
+
+      _logError('Timeout');
+      if (onTimeout != null) {
+        await onTimeout(this);
+      } else if (this.onTimeout != null) {
+        await this.onTimeout!(this);
+      } else if (instance.defaultOnTimeout != null) {
+        await instance.defaultOnTimeout!(this);
+      }
+      return;
     } catch (e) {
       if (onRequestFinish != null) {
         await onRequestFinish(this);
@@ -302,24 +315,13 @@ class FnHttp {
         await this.onRequestFinish!(this);
       }
 
-      if (e == 'timeout') {
-        _logError('Timeout');
-        if (onTimeout != null) {
-          await onTimeout(this);
-        } else if (this.onTimeout != null) {
-          await this.onTimeout!(this);
-        } else if (instance.defaultOnTimeout != null) {
-          await instance.defaultOnTimeout!(this);
-        }
-      } else {
-        _logError('Failed Connection');
-        if (onFailedConnection != null) {
-          await onFailedConnection(this);
-        } else if (this.onFailedConnection != null) {
-          await this.onFailedConnection!(this);
-        } else if (instance.defaultOnFailedConnection != null) {
-          await instance.defaultOnFailedConnection!(this);
-        }
+      _logError('Failed Connection');
+      if (onFailedConnection != null) {
+        await onFailedConnection(this);
+      } else if (this.onFailedConnection != null) {
+        await this.onFailedConnection!(this);
+      } else if (instance.defaultOnFailedConnection != null) {
+        await instance.defaultOnFailedConnection!(this);
       }
       return;
     }
@@ -328,9 +330,10 @@ class FnHttp {
     _logResponse();
 
     try {
-      jsonDecodedResponse = jsonDecode(utf8.decode(response!.bodyBytes));
+      jsonDecodedResponse =
+          jsonDecode(utf8.decode(response!.bodyBytes)) as Map<String, dynamic>?;
     } catch (e) {
-      jsonDecodedResponse = {};
+      jsonDecodedResponse = null;
       _logError('Failed JSON Decoding');
     }
 
