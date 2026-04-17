@@ -13,7 +13,7 @@ class FnHttpInstance {
   final FnHttpAssessor? defaultAssessor;
   final FnHttpCallback? defaultOnFailure;
 
-  const FnHttpInstance({
+  FnHttpInstance({
     required this.instanceLogName,
     this.defaultPreRequest,
     this.defaultOnAborted,
@@ -23,7 +23,15 @@ class FnHttpInstance {
     this.defaultOnFailedConnection,
     this.defaultAssessor,
     this.defaultOnFailure,
-  });
+  }) {
+    if (instanceLogName.isEmpty || instanceLogName.trim().isEmpty) {
+      throw ArgumentError.value(
+        instanceLogName,
+        'instanceLogName',
+        'must not be empty or whitespace',
+      );
+    }
+  }
 
   void sendLog(String message, [String? additionalName]) {
     log(

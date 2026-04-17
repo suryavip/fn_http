@@ -98,15 +98,17 @@ class FnHttp {
     this.onRequestFinish,
     this.onSuccess,
     this.onFailure,
-  }) : headers = headers ?? {},
-       assert(
-         (bodyFields == null && bodyJson == null) ||
-             (bodyFields != null && bodyJson == null) ||
-             (bodyJson != null &&
-                 bodyFields == null &&
-                 files.isEmpty &&
-                 xFiles.isEmpty),
-       );
+  }) : headers = headers ?? {} {
+    // Validate body configuration: only one of bodyFields or bodyJson can be set
+    if (bodyFields != null && bodyJson != null) {
+      throw ArgumentError('Cannot specify both bodyFields and bodyJson');
+    }
+
+    // Validate body/file configuration: files not allowed with bodyJson
+    if (bodyJson != null && (files.isNotEmpty || xFiles.isNotEmpty)) {
+      throw ArgumentError('Cannot specify files with bodyJson');
+    }
+  }
 
   void _logRequest() {
     instance.sendLog(
@@ -161,6 +163,31 @@ class FnHttp {
     headers.addAll(additionalHeaders);
   }
 
+  /// Parse MIME type string into MediaType object.
+  /// Returns null if mimeType is null or cannot be parsed.
+  MediaType? _parseMediaType(String? mimeType) {
+    if (mimeType == null) return null;
+    final split = mimeType.split('/');
+    if (split.length != 2) return null;
+    return MediaType(split[0], split[1]);
+  }
+
+  /// Execute a callback, preferring local override over instance default.
+  /// Returns future that completes when callback finishes, or immediately if none.
+  Future<void> _executeCallback(
+    FnHttpCallback? localCallback,
+    FnHttpCallback? Function() instanceCallbackGetter,
+  ) async {
+    if (localCallback != null) {
+      await localCallback(this);
+    } else {
+      final instanceCallback = instanceCallbackGetter();
+      if (instanceCallback != null) {
+        await instanceCallback(this);
+      }
+    }
+  }
+
   late Duration? _lastTimeout;
   late FnHttpCallback? _lastOnTimeout;
   late FnHttpCallback? _lastOnFailedConnection;
@@ -203,17 +230,8 @@ class FnHttp {
     }
 
     if (preRequestResult == false) {
-      if (onRequestFinish != null) {
-        await onRequestFinish(this);
-      } else if (this.onRequestFinish != null) {
-        await this.onRequestFinish!(this);
-      }
-
-      if (onAborted != null) {
-        await onAborted!(this);
-      } else if (instance.defaultOnAborted != null) {
-        await instance.defaultOnAborted!(this);
-      }
+      await _executeCallback(onRequestFinish, () => this.onRequestFinish);
+      await _executeCallback(onAborted, () => instance.defaultOnAborted);
       return;
     }
 
@@ -226,16 +244,14 @@ class FnHttp {
     if (files.isNotEmpty || xFiles.isNotEmpty || multipartFiles.isNotEmpty) {
       request = http.MultipartRequest(method, uri);
       (request as http.MultipartRequest).fields.addAll(bodyFields ?? {});
+
+      // Add files from File entries
       for (final key in files.keys) {
         final filesPerKey = files[key]!;
         for (final file in filesPerKey) {
           final data = await file.readAsBytes();
           final mimeType = lookupMimeType(file.path, headerBytes: data);
-          MediaType? contentType;
-          if (mimeType != null) {
-            final split = mimeType.split('/');
-            contentType = MediaType(split[0], split[1]);
-          }
+          final contentType = _parseMediaType(mimeType);
           (request as http.MultipartRequest).files.add(
             http.MultipartFile.fromBytes(
               key,
@@ -246,16 +262,14 @@ class FnHttp {
           );
         }
       }
+
+      // Add files from XFile entries
       for (final key in xFiles.keys) {
         final filesPerKey = xFiles[key]!;
         for (final file in filesPerKey) {
           final data = await file.readAsBytes();
           final mimeType = lookupMimeType(file.path, headerBytes: data);
-          MediaType? contentType;
-          if (mimeType != null) {
-            final split = mimeType.split('/');
-            contentType = MediaType(split[0], split[1]);
-          }
+          final contentType = _parseMediaType(mimeType);
           (request as http.MultipartRequest).files.add(
             http.MultipartFile.fromBytes(
               key,
@@ -266,6 +280,8 @@ class FnHttp {
           );
         }
       }
+
+      // Add pre-built multipart files
       for (final multipartFile in multipartFiles) {
         (request as http.MultipartRequest).files.add(multipartFile);
       }
@@ -293,36 +309,22 @@ class FnHttp {
         result = await request.send();
       }
     } on TimeoutException {
-      if (onRequestFinish != null) {
-        await onRequestFinish(this);
-      } else if (this.onRequestFinish != null) {
-        await this.onRequestFinish!(this);
-      }
+      await _executeCallback(onRequestFinish, () => this.onRequestFinish);
 
       _logError('Timeout');
-      if (onTimeout != null) {
-        await onTimeout(this);
-      } else if (this.onTimeout != null) {
-        await this.onTimeout!(this);
-      } else if (instance.defaultOnTimeout != null) {
-        await instance.defaultOnTimeout!(this);
-      }
+      await _executeCallback(
+        onTimeout,
+        () => this.onTimeout ?? instance.defaultOnTimeout,
+      );
       return;
     } catch (e) {
-      if (onRequestFinish != null) {
-        await onRequestFinish(this);
-      } else if (this.onRequestFinish != null) {
-        await this.onRequestFinish!(this);
-      }
+      await _executeCallback(onRequestFinish, () => this.onRequestFinish);
 
       _logError('Failed Connection');
-      if (onFailedConnection != null) {
-        await onFailedConnection(this);
-      } else if (this.onFailedConnection != null) {
-        await this.onFailedConnection!(this);
-      } else if (instance.defaultOnFailedConnection != null) {
-        await instance.defaultOnFailedConnection!(this);
-      }
+      await _executeCallback(
+        onFailedConnection,
+        () => this.onFailedConnection ?? instance.defaultOnFailedConnection,
+      );
       return;
     }
 
@@ -337,11 +339,7 @@ class FnHttp {
       _logError('Failed JSON Decoding');
     }
 
-    if (onRequestFinish != null) {
-      await onRequestFinish(this);
-    } else if (this.onRequestFinish != null) {
-      await this.onRequestFinish!(this);
-    }
+    await _executeCallback(onRequestFinish, () => this.onRequestFinish);
 
     AssessmentResult assessmentResult = AssessmentResult.success;
     if (assessor != null) {
@@ -351,23 +349,16 @@ class FnHttp {
     }
 
     if (assessmentResult == AssessmentResult.success) {
-      if (onSuccess != null) {
-        await onSuccess(this);
-      } else if (this.onSuccess != null) {
-        await this.onSuccess!(this);
-      }
+      await _executeCallback(onSuccess, () => this.onSuccess);
     } else if (assessmentResult == AssessmentResult.retry) {
       _logError('Retry recommended by assessor');
       await retry();
     } else {
       _logError('Not pass assessor');
-      if (onFailure != null) {
-        await onFailure(this);
-      } else if (this.onFailure != null) {
-        await this.onFailure!(this);
-      } else if (instance.defaultOnFailure != null) {
-        await instance.defaultOnFailure!(this);
-      }
+      await _executeCallback(
+        onFailure,
+        () => this.onFailure ?? instance.defaultOnFailure,
+      );
     }
   }
 }
