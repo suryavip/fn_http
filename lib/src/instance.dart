@@ -34,12 +34,6 @@ class FnHttpInstance {
   }
 
   void sendLog(String message, [String? additionalName]) {
-    log(
-      message,
-      name: [
-        instanceLogName,
-        if (additionalName != null) additionalName,
-      ].join('::'),
-    );
+    log(message, name: [instanceLogName, ?additionalName].join('::'));
   }
 }

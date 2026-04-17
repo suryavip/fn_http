@@ -1,3 +1,8 @@
+## 5.0.0
+
+- Dart SDK requirement to `^3.11.4`
+- Change `jsonDecodedResponse` type into `Map<String, dynamic>?`, `jsonDecodedResponse` will be `null` if there is no successful decoding (including failed request).
+
 ## 4.0.0
 
 - Dart SDK requirement to `^3.7.0`
